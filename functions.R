@@ -784,12 +784,12 @@ runGMT<-function(limits,outFile="output.ps",width=6,dataFile="hexs.dat",gmtDir="
 	pos<-sprintf('%s -X%fi -Y%fi',posOptions,xpos,ypos)
 	systemOut(gmtDir,"psbasemap -R",paste(c(xlim,ylim),collapse="/")," -JM",width,"i -G255 -P -K ",pos,adder,outFile)
 	
-	if (!landMask) systemOut(gmtDir,"pscoast -R -JM -O -K -D",pscoastRes," -W1/110 -G220 -A0/0/1 >>",outFile) 
+	if (!landMask) systemOut(gmtDir,"pscoast -R -JM -O -K -D",pscoastRes," -W1/110 -G220 -A2000/0/2 ",pscoastOptions," >>",outFile) 
 
 	#output to gmthex.dat
 	systemOut(gmtDir,"psxy ",dataFile," -R -JM -O -K -A -M -G0 -W1/",borderColor," -V>>",outFile)
-	if (!landMask) systemOut(gmtDir,"pscoast -R -JM -O -K -D",pscoastRes," -W1/0 -A2000/0/2 ",pscoastOptions," `>>",outFile)
-	else systemOut(gmtDir,"pscoast -R -JM -O -K -D",pscoastRes," -W1/0 -A2000/0/2 -G220 ",pscoastOptions," >>",outFile)
+	if (!landMask) systemOut(gmtDir,"pscoast -R -JM -O -K -D",pscoastRes," -W1/0 -A2000/0/2 ",pscoastOptions," >>",outFile)
+	else           systemOut(gmtDir,"pscoast -R -JM -O -K -D",pscoastRes," -W1/0 -A2000/0/2 -G220 ",pscoastOptions," >>",outFile)
 	#Redo border since coast covers up
 	systemOut(gmtDir,"psbasemap -R -JM -B",xanot/2,"a",xanot,"/",yanot/2,"a",yanot,annotateBorders," -P -O -K>>",outFile)
 	if (!is.null(contourFile)){
