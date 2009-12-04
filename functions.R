@@ -187,6 +187,7 @@ readDouglas<-function(path=".",search="br[0-9][^.]+[0-9]\\.txt",ignoreErrors=FAL
 	#hexPerDegree: How many hexs should fit horizontally in 1 degree of longitude at the equator
 	#limits: A vector of (southernMostLatitude,northernMostLatitude,westernMostLongitude,easternMostLongitude) for final hexMap or NULL to select automatically
 	#extraCmd: If not NULL, vector of system commands to run after other GMT commands and before scale (e.g. extra labels with pstext)
+	#landMaskCmd: If not NULL, vector of system commands to run after hex output and before pscoast (e.g. polygons over hexes)
 	#hardLimit: A vector of (southernMostLatitude,northernMostLatitude,westernMostLongitude,easternMostLongitude) for cropping hexs or NULL to not crop
 	#hexMax: Sets hexs with counts > hexMax to hexMax (for creating maps with the highest hex counts being something like "100+")
 	#histPrefix: If not NULL, create histogram files of hex counts in {histPrefix}_hist.ps 
@@ -203,6 +204,10 @@ readDouglas<-function(path=".",search="br[0-9][^.]+[0-9]\\.txt",ignoreErrors=FAL
 	#allOneColor: All hexes a single color e.g. '20/20/20'
 	#proportion: Divide counts by sum(counts)
 	#showMax: show maximum on scale ticks
+	#proportionByAnimal: weight points to add up to one for each animal
+	#seaonLimit: When using proportionByAnimal, if less than seasonLimit points then total animal weight = # points/seasonLimit otherwise 1
+	#uniqueAnimals: Count unique occurrences of animal in a hex
+	#outlineCount: Draw an outline around all hexes with count >= outlineCount
 	#...: Any other arguments to be passed to runGMT
 #Side Effects: 
 	#Generates various intermediary files (detailed in other functions) for use in plotting
@@ -210,7 +215,7 @@ readDouglas<-function(path=".",search="br[0-9][^.]+[0-9]\\.txt",ignoreErrors=FAL
 	#If daybrs contains column 'stateDep' generates animalTable.csv and dayTable.csv showing number of animal and animal-days from each state
 	#Generates postscript hexmap plot in outFile
 #Return: Vector of (lowXLim,highXlim,lowYLim,highYLim,maxHexCount) can be stored and passed as limits={return}, hardLimit={return} to further hexPlot calls to use the same range of latitude and longitude
-hexPlot<-function(daybrs,outFile,hexPerDegree=1,limits=NULL,extraCmd=NULL,hardLimit=NULL,hexMax=NULL,histPrefix=NULL,stateCount=FALSE,logCounts=FALSE,debug=FALSE,maxInterp=7,gmtDir="",contourFile=NULL,contourDepth=-200,dayScale=1,interp=1,addNumberToName=TRUE,allOneColor=NULL,proportion=FALSE,showMax=TRUE,...){
+hexPlot<-function(daybrs,outFile,hexPerDegree=1,limits=NULL,extraCmd=NULL,landMaskCmd=NULL,hardLimit=NULL,hexMax=NULL,histPrefix=NULL,stateCount=FALSE,logCounts=FALSE,debug=FALSE,maxInterp=7,gmtDir="",contourFile=NULL,contourDepth=-200,dayScale=1,interp=1,addNumberToName=TRUE,allOneColor=NULL,proportion=FALSE,showMax=TRUE,proportionByAnimal=FALSE,seasonLimit=0,uniqueAnimals=FALSE,outlineCount=NULL,...){
 	#Interpolate between days
 	interps<-fill.missing.days(daybrs$animal,daybrs$rdate,daybrs$lat,daybrs$lon,maxInterp,interp)
 	colnames(interps)<-c('animal','rdate','lat','lon')
@@ -238,14 +243,66 @@ hexPlot<-function(daybrs,outFile,hexPerDegree=1,limits=NULL,extraCmd=NULL,hardLi
 			extraCmd<-c(extraCmd,"psxy states.dat -R -JM -O -K -A -M>>","pstext stateStats.dat -JM -R -O -K>>",exCmds)	
 		}
 	}
-	newlimits<-makeHexs(finalbrs$lat,finalbrs$lon,file="hexs.dat",hexPerDegree=hexPerDegree,hardLimit=hardLimit,hexMax=hexMax,histPrefix=histPrefix,logCounts=logCounts,debug=debug,scale=dayScale,allOneColor=allOneColor,proportion=proportion,showMax=showMax)
+	if(proportionByAnimal){
+		seasonCount<-ave(finalbrs$lat,finalbrs$animal,FUN=length)
+		weights<-1/seasonCount*ifelse(seasonCount>=seasonLimit,1,seasonCount/seasonLimit)
+	}else{
+		weights<-rep(1,nrow(finalbrs))
+	}
+	if(uniqueAnimals)uniqueCounter<-finalbrs$animal
+	else uniqueCounter<-NULL
+	newlimits<-makeHexs(finalbrs$lat,finalbrs$lon,file="hexs.dat",hexPerDegree=hexPerDegree,hardLimit=hardLimit,hexMax=hexMax,histPrefix=histPrefix,logCounts=logCounts,debug=debug,scale=dayScale,allOneColor=allOneColor,proportion=proportion,showMax=showMax,weights=weights,uniqueCounter=uniqueCounter)
+	hexs<-newlimits[[4]]
+	hexPoints<-newlimits[[5]]
+
+	newlimits<-unlist(newlimits[-c(4,5)])
+	
+	if(!is.null(outlineCount)){
+		if(!require(adehabitat))stop(simpleError('Outlining counts requires the package adehabitat'))
+
+		goodHexs<-hexs[hexs$count>=outlineCount,]
+		goodPoints<-hexPoints[hexPoints$count>=outlineCount&hexPoints$selector!=1,]
+		if(nrow(goodPoints)>0){
+			hexPolys<-by(goodPoints,rep(1:(nrow(goodPoints)/6),each=6),function(x)as(round(x[,c('coordx','coordy')],4),'gpc.poly'))
+			for(poly in hexPolys){
+				if(!exists('totalPoly'))totalPoly<-poly
+				else totalPoly<-union(totalPoly,poly)
+			}
+			polyOut<-c()
+			for(poly in totalPoly@pts){
+				if(!poly$hole)polyOut<-c(polyOut,'>',paste(poly$x,poly$y,sep='\t'))
+			}
+			writeLines(polyOut,'countOutline.dat')
+			landMaskCmd<-c(landMaskCmd,"psxy -R -JM -O -K -W4,0 -M -L <countOutline.dat>>")
+		}
+		#k=0 should be minimum convex hull
+		#homeRanges<-NNCH(unique(goodHexs[,c('x','y')]), a=5,duplicate='ignore')
+		#date();homeRanges<-NNCH(unique(goodPoints[,c('coordx','coordy')]), a=5,duplicate='ignore');date()
+		#polys<-homeRanges[[1]]$polygons
+		#getting 100% poly
+		#thisPoly<-polys[[length(polys)]]@pts
+		#polyOut<-c()
+		#for(j in thisPoly){
+		#	if(!j$hole)polyOut<-c('>',paste(j$x,j$y,sep='\t'))
+		#}
+		#writeLines(polyOut,'countOutline.dat',sep="\t",quote=FALSE,row.names=FALSE,col.names=FALSE)
+		#extraCmd<-c(extraCmd,"psxy -R -JM -O -K -W4,0 -G<countOutline.dat>>")
+
+		#write.table(homeRanges[,c('X','Y')],'countOutline.dat',sep="\t",quote=FALSE,row.names=FALSE,col.names=FALSE)
+
+		#extraCmd<-c(extraCmd,"psxy -R -JM -O -K -W4,0<countOutline.dat>>")
+		#homeRanges<-mcp(goodPoints[,c('coordx','coordy')],rep(1,nrow(goodPoints)),percent=100)
+
+		#write.table(homeRanges[,c('X','Y')],'countOutline.dat',sep="\t",quote=FALSE,row.names=FALSE,col.names=FALSE)
+		#extraCmd<-c(extraCmd,"psxy -R -JM -O -K -W4,0<countOutline.dat>>")
+	}
 	if(is.null(limits)) limits<-newlimits
 	outFileTemp<-strsplit(outFile,'\\.')[[1]]
 	animals<-length(unique(daybrs$animal))
 	days<-ceiling(length(daybrs$animal)/dayScale)
 	outFileTemp[1]<-paste(outFileTemp[1],'_',animals,'t_',round(days/dayScale),'d',sep="")
 	if(addNumberToName)outFile<-paste(outFileTemp,collapse=".")
-	runGMT(limits,outFile=outFile,dataFile="hexs.dat",gmtDir=gmtDir,contourFile=contourFile,contourDepth=contourDepth,extraCmd=extraCmd,...)
+	runGMT(limits,outFile=outFile,dataFile="hexs.dat",gmtDir=gmtDir,contourFile=contourFile,contourDepth=contourDepth,extraCmd=extraCmd,landMaskCmd=landMaskCmd,...)
 	return(newlimits)
 }
 
@@ -453,6 +510,8 @@ fill.missing.days <- function(id,date,lat,lon,maxinterp=7,interp=1){
 	#allOneColor: Make all hexes a single color e.g. '20/20/20'
 	#proportion: Divide counts by sum(counts)
 	#showMax: show maximum on scale ticks?
+	#weights: Weight for each point
+	#uniqueCounter: If not NULL, count unique occurrences of uniqueCounter in a hex
 #Side Effects: 
 	#Writes lat/lon color information to file specified by file parameter in a format ready to use in GMT (but probably easy to parse by other programs too)
 	#If histPrefix is not NULL writes histograms to {histPrefix}_hist{XXX}.eps
@@ -460,7 +519,7 @@ fill.missing.days <- function(id,date,lat,lon,maxinterp=7,interp=1){
 	#Makes GMT color table scale.cpt for later use
 	#Calls makeTicks() which will output tick position for scalebar for later use
 #Return: Vector for use in further functions of (lowXLim,highXlim,lowYLim,highYLim,maxHexCount)
-makeHexs<-function(lat,lon,lonBase=-45,hexPerDegree=1,border=5,file="hexs.dat",hardLimit=NULL,hexMax=NULL,logCounts=FALSE,histPrefix=NULL,debug=FALSE,scale=1,allOneColor=NULL,proportion=FALSE,showMax=FALSE){
+makeHexs<-function(lat,lon,lonBase=-45,hexPerDegree=1,border=5,file="hexs.dat",hardLimit=NULL,hexMax=NULL,logCounts=FALSE,histPrefix=NULL,debug=FALSE,scale=1,allOneColor=NULL,proportion=FALSE,showMax=FALSE,weights=rep(1,length(lat)),uniqueCounter=NULL){
 	xlim <- range(lon)
 	xlim[1] <- round(xlim[1] - border)
 	xlim[2] <- round(xlim[2] + border)
@@ -482,7 +541,7 @@ makeHexs<-function(lat,lon,lonBase=-45,hexPerDegree=1,border=5,file="hexs.dat",h
 	}
 	xhexs<-diff(convXlim)*hexPerDegree
 	shape<-1
-	bin <- hexbin(convLon, lat, xbins = xhexs,xbnds=convXlim,ybnds=convYlim,shape=shape,IDs=FALSE)
+	bin <- hexbin(convLon, lat, xbins = xhexs,xbnds=convXlim,ybnds=convYlim,shape=shape,IDs=TRUE)
 	cellxy<-hcell2xy(bin)
 	message("Outputted test hex positions to testhex.eps")
 	postscript("testhex.eps")
@@ -503,7 +562,16 @@ makeHexs<-function(lat,lon,lonBase=-45,hexPerDegree=1,border=5,file="hexs.dat",h
 			dev.off()
 		}
 	}
+
 	proportionScale<-1
+	if(!is.null(uniqueCounter)) weightSum<-tapply(uniqueCounter,bin@cID,function(x)length(unique(x)))
+	else weightSum<-tapply(weights,bin@cID,sum)
+	if(any(names(weightSum)!=bin@cell))stop(simpleError('Problem setting bin counts'))
+	bin@count<-as.vector(weightSum)
+	if(any(weights!=1)){
+		proportionScale<-10000
+		bin@count<-ceiling(bin@count*proportionScale)
+	}
 	if(proportion){
 		proportionScale<-10000
 		bin@count<-ceiling(bin@count/sum(bin@count)*proportionScale)
@@ -513,8 +581,7 @@ makeHexs<-function(lat,lon,lonBase=-45,hexPerDegree=1,border=5,file="hexs.dat",h
 		message(paste("Capping hex counts at",hexMax))
 		bin@count[bin@count>hexMax]<-hexMax
 	}
-	output<-data.frame(cellxy$x,cellxy$y,bin@count)
-	colnames(output)<-c('x','y','count')
+	output<-data.frame('x'=cellxy$x,'y'=cellxy$y,'count'=bin@count)
 	r<-180/pi
 	vertHexRadius<-horHexRadius/sin(60/r)
 	output$topy<-output$y+vertHexRadius
@@ -547,6 +614,7 @@ makeHexs<-function(lat,lon,lonBase=-45,hexPerDegree=1,border=5,file="hexs.dat",h
 		write.table(c("#	cpt file created by: R","#COLOR_MODEL = RGB","#"),'scale.cpt',sep="\t",quote=FALSE,row.names=FALSE,col.names=FALSE)
 		if (cptoutput[1,1]==0)cptoutput[1,1]<-0.00001	
 		write.table(cptoutput,'scale.cpt',sep="\t",quote=FALSE,row.names=FALSE,col.names=FALSE,append=TRUE)
+
 		makeTicks(output$count,logCounts,hexMax=hexMax,adjustScale=proportionScale,showMax=showMax)
 		numCheck<-length(output$x)
 		output<-merge(output,countcolors)
@@ -603,8 +671,10 @@ makeHexs<-function(lat,lon,lonBase=-45,hexPerDegree=1,border=5,file="hexs.dat",h
 	}
 	message(paste("Wrote hex data to file",file,sep=""))
 	#Return x and ylims for next function
+	output$count<-output$count/proportionScale
+	stackoutput$count<-stackoutput$count/proportionScale
 	if (debug) browser()
-	return(c(xlim,ylim,max(bin@count)))
+	return(list(xlim,ylim,max(bin@count),output,stackoutput))
 }
 
 #Function:countColors<-red2bluehsl(maxCount,minCount)
@@ -706,8 +776,12 @@ makeTicks<-function(counts,isLog=FALSE,showMax=TRUE,hexMax=NULL,addMin=TRUE,adju
 		ticks<-pretty(counts/adjustScale)
 		ticks<-ticks[ticks<=maxCount/adjustScale]
 		if (!any(ticks==maxCount/adjustScale)&showMax) ticks<-c(ticks,maxCount/adjustScale)
-		if (any(ticks==0)) ticks<-c(1,ticks[ticks!=0])
+		if (any(ticks==0)&any(ticks>1)) ticks<-c(1,ticks[ticks!=0])
 		labels<-ticks
+		max1<-max(labels)
+		max2<-max(labels[labels!=max1])
+		if(max1-max2<diff(range(labels))*.05)labels<-labels[labels!=max2]
+
 		suppress<-NULL
 	}
 	ticks<-sort(c(ticks,ticks,ticks))
@@ -745,6 +819,7 @@ makeTicks<-function(counts,isLog=FALSE,showMax=TRUE,hexMax=NULL,addMin=TRUE,adju
 	#contourFile: If not NULL, run pscontour at contourDepth meters based on this GMT elevation file
 	#contourDepth: Depth to draw contour in meters
 	#extraCmd: If not NULL, vector of system commands to run after other GMT commands and before scale (e.g. extra labels with pstext)
+	#landMaskCmd: If not NULL, vector of system commands to run prior to final psCoast (e.g. polygons overlaid by coast)
 	#landMask: If TRUE, hexs overlapping land are covered by land else hexs overlap land and only the land border is plotted over them
 	#ps2eps: If TRUE, after all other commands calls the program ps2eps to convert .ps to .eps (Make sure you have ps2eps installed and in path if you use this)
 	#scaleLabel: Label for scale if scale is TRUE
@@ -756,7 +831,7 @@ makeTicks<-function(counts,isLog=FALSE,showMax=TRUE,hexMax=NULL,addMin=TRUE,adju
 	#borderColor: color for border of hexes
 	#pscoastOptions: command line options for pscoast
 #Return: Nothing
-runGMT<-function(limits,outFile="output.ps",width=6,dataFile="hexs.dat",gmtDir="",scale=TRUE,contourFile=NULL,contourDepth=-200,extraCmd=NULL,landMask=TRUE,ps2eps=FALSE,scaleLabel="Days Turtles Recorded in Hex",contourPen='1/120ta',concatenate=FALSE,xpos=3,ypos=1.8,posOptions=ifelse(concatenate,'-O',''),gmtsetOptions=NULL,annotateBorders='WSen',borderColor=255,pscoastOptions=''){
+runGMT<-function(limits,outFile="output.ps",width=6,dataFile="hexs.dat",gmtDir="",scale=TRUE,contourFile=NULL,contourDepth=-200,extraCmd=NULL,landMaskCmd=NULL,landMask=TRUE,ps2eps=FALSE,scaleLabel="Days Turtles Recorded in Hex",contourPen='1/120ta',concatenate=FALSE,xpos=3,ypos=1.8,posOptions=ifelse(concatenate,'-O',''),gmtsetOptions=NULL,annotateBorders='WSen',borderColor=255,pscoastOptions=''){
 	if(!is.null(gmtsetOptions))systemOut(gmtDir,'gmtset ',gmtsetOptions)
 	xlim<-limits[1:2]
 	ylim<-limits[3:4]
@@ -787,15 +862,27 @@ runGMT<-function(limits,outFile="output.ps",width=6,dataFile="hexs.dat",gmtDir="
 	if (!landMask) systemOut(gmtDir,"pscoast -R -JM -O -K -D",pscoastRes," -W1/110 -G220 -A2000/0/2 ",pscoastOptions," >>",outFile) 
 
 	#output to gmthex.dat
-	systemOut(gmtDir,"psxy ",dataFile," -R -JM -O -K -A -M -G0 -W1/",borderColor," -V>>",outFile)
-	if (!landMask) systemOut(gmtDir,"pscoast -R -JM -O -K -D",pscoastRes," -W1/0 -A2000/0/2 ",pscoastOptions," >>",outFile)
-	else           systemOut(gmtDir,"pscoast -R -JM -O -K -D",pscoastRes," -W1/0 -A2000/0/2 -G220 ",pscoastOptions," >>",outFile)
+	if(!is.null(borderColor))borderCmd<-sprintf("-W1/%s",borderColor)
+	else borderCmd<-''
+	systemOut(gmtDir,"psxy ",dataFile," -R -JM -O -K -A -M -G0 ",borderCmd," -V>>",outFile)
+	if (!is.null(landMaskCmd)){
+		for (i in 1:length(landMaskCmd)) {
+			systemOut(gmtDir,landMaskCmd[i],outFile)
+		}
+	}
+	if (!landMask){
+		systemOut(gmtDir,"pscoast -R -JM -O -K -D",pscoastRes," -W1/0 -A0/0/2 ",pscoastOptions," >>",outFile)
+		systemOut(gmtDir,"pscoast -R -JM -O -K -D",pscoastRes," -W1/0 -A2000/0/2 ",pscoastOptions," >>",outFile)
+	}else{
+		systemOut(gmtDir,"pscoast -R -JM -O -K -D",pscoastRes," -W1/0 -A0/0/2 -G220 ",pscoastOptions," >>",outFile)
+		systemOut(gmtDir,"pscoast -R -JM -O -K -D",pscoastRes," -W1/0 -A2000/0/2 -G220 ",pscoastOptions," >>",outFile)
+	}
 	#Redo border since coast covers up
 	systemOut(gmtDir,"psbasemap -R -JM -B",xanot/2,"a",xanot,"/",yanot/2,"a",yanot,annotateBorders," -P -O -K>>",outFile)
 	if (!is.null(contourFile)){
 		#Generate contour at contourDepth meters
 		write.table(c(paste(contourDepth,' c',sep="")),'contour.cont',sep="\t",quote=FALSE,row.names=FALSE,col.names=FALSE)
-		systemOut(gmtDir,'grdcontour ',contourFile,' -R -JM -O -K -Ccontour.cont -A+k120+s5 -W',contourPen,' -Q800 >>',outFile)
+		sapply(contourPen,function(x)systemOut(gmtDir,'grdcontour ',contourFile,' -R -JM -O -K -Ccontour.cont -A+k120+s5 -W',x,' -Q800 >>',outFile))
 	}
 	if (!is.null(extraCmd)){
 		for (i in 1:length(extraCmd)) {
