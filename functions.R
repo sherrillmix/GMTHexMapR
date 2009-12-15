@@ -208,6 +208,7 @@ readDouglas<-function(path=".",search="br[0-9][^.]+[0-9]\\.txt",ignoreErrors=FAL
 	#seaonLimit: When using proportionByAnimal, if less than seasonLimit points then total animal weight = # points/seasonLimit otherwise 1
 	#uniqueAnimals: Count unique occurrences of animal in a hex
 	#outlineCount: Draw an outline around all hexes with count >= outlineCount
+	#outlineCount: Draw an outline around enough hexs to cover propCount proportion of the data (overrides outlineCount)
 	#...: Any other arguments to be passed to runGMT
 #Side Effects: 
 	#Generates various intermediary files (detailed in other functions) for use in plotting
@@ -215,7 +216,7 @@ readDouglas<-function(path=".",search="br[0-9][^.]+[0-9]\\.txt",ignoreErrors=FAL
 	#If daybrs contains column 'stateDep' generates animalTable.csv and dayTable.csv showing number of animal and animal-days from each state
 	#Generates postscript hexmap plot in outFile
 #Return: Vector of (lowXLim,highXlim,lowYLim,highYLim,maxHexCount) can be stored and passed as limits={return}, hardLimit={return} to further hexPlot calls to use the same range of latitude and longitude
-hexPlot<-function(daybrs,outFile,hexPerDegree=1,limits=NULL,extraCmd=NULL,landMaskCmd=NULL,hardLimit=NULL,hexMax=NULL,histPrefix=NULL,stateCount=FALSE,logCounts=FALSE,debug=FALSE,maxInterp=7,gmtDir="",contourFile=NULL,contourDepth=-200,dayScale=1,interp=1,addNumberToName=TRUE,allOneColor=NULL,proportion=FALSE,showMax=TRUE,proportionByAnimal=FALSE,seasonLimit=0,uniqueAnimals=FALSE,outlineCount=NULL,...){
+hexPlot<-function(daybrs,outFile,hexPerDegree=1,limits=NULL,extraCmd=NULL,landMaskCmd=NULL,hardLimit=NULL,hexMax=NULL,histPrefix=NULL,stateCount=FALSE,logCounts=FALSE,debug=FALSE,maxInterp=7,gmtDir="",contourFile=NULL,contourDepth=-200,dayScale=1,interp=1,addNumberToName=TRUE,allOneColor=NULL,proportion=FALSE,showMax=TRUE,proportionByAnimal=FALSE,seasonLimit=0,uniqueAnimals=FALSE,outlineCount=NULL,propCount=NULL,...){
 	#Interpolate between days
 	interps<-fill.missing.days(daybrs$animal,daybrs$rdate,daybrs$lat,daybrs$lon,maxInterp,interp)
 	colnames(interps)<-c('animal','rdate','lat','lon')
@@ -257,7 +258,13 @@ hexPlot<-function(daybrs,outFile,hexPerDegree=1,limits=NULL,extraCmd=NULL,landMa
 
 	newlimits<-unlist(newlimits[-c(4,5)])
 	
-	if(!is.null(outlineCount)){
+	if(!is.null(outlineCount)|!is.null(propCount)){
+		if(!is.null(propCount)){
+			uniqueCounts<-unique(hexs$count)
+			countProps<-sapply(uniqueCounts,function(x,y)sum(hexs$count[hexs$count>=x])/y,sum(hexs$count))
+			outlineCount<-uniqueCounts[countProps==min(countProps[countProps>=propCount])]
+			message('Selected cutoff ',outlineCount,'. Covering ',sum(hexs$count>=outlineCount),' out of ',length(hexs$count),' hexs.')
+		}
 		if(!require(adehabitat))stop(simpleError('Outlining counts requires the package adehabitat'))
 
 		goodHexs<-hexs[hexs$count>=outlineCount,]
@@ -296,11 +303,12 @@ hexPlot<-function(daybrs,outFile,hexPerDegree=1,limits=NULL,extraCmd=NULL,landMa
 		#write.table(homeRanges[,c('X','Y')],'countOutline.dat',sep="\t",quote=FALSE,row.names=FALSE,col.names=FALSE)
 		#extraCmd<-c(extraCmd,"psxy -R -JM -O -K -W4,0<countOutline.dat>>")
 	}
+	message('Hexs in plot sum to ',sum(hexs$count),'. Total data sum to ',sum(weights))
 	if(is.null(limits)) limits<-newlimits
 	outFileTemp<-strsplit(outFile,'\\.')[[1]]
 	animals<-length(unique(daybrs$animal))
 	days<-ceiling(length(daybrs$animal)/dayScale)
-	outFileTemp[1]<-paste(outFileTemp[1],'_',animals,'t_',round(days/dayScale),'d',sep="")
+	outFileTemp[1]<-paste(outFileTemp[1],'_',animals,'t_',round(days),'d',sep="")
 	if(addNumberToName)outFile<-paste(outFileTemp,collapse=".")
 	runGMT(limits,outFile=outFile,dataFile="hexs.dat",gmtDir=gmtDir,contourFile=contourFile,contourDepth=contourDepth,extraCmd=extraCmd,landMaskCmd=landMaskCmd,...)
 	return(newlimits)
@@ -780,7 +788,7 @@ makeTicks<-function(counts,isLog=FALSE,showMax=TRUE,hexMax=NULL,addMin=TRUE,adju
 		labels<-ticks
 		max1<-max(labels)
 		max2<-max(labels[labels!=max1])
-		if(max1-max2<diff(range(labels))*.05)labels<-labels[labels!=max2]
+		if(max1-max2<diff(range(labels))*.015*nchar(max1))labels<-labels[labels!=max2]
 
 		suppress<-NULL
 	}
@@ -800,7 +808,7 @@ makeTicks<-function(counts,isLog=FALSE,showMax=TRUE,hexMax=NULL,addMin=TRUE,adju
 	ticks$text[!is.na(ticks$y)]<-paste(ticks[!is.na(ticks$y),c('x')],ticks[!is.na(ticks$y),c('y')])
 	labelers<-ticks[ticks$ticks %in% labels&is.na(ticks$y)&!ticks$ticks %in% suppress,]
 	labelers$y<-.3
-	labelers$text<-paste(labelers$x,labelers$y,"10 0 1 CT",labelers$ticks)
+	labelers$text<-paste(labelers$x,labelers$y,"10 0 1 CT",format(labelers$ticks,digits=2,drop0trailing=TRUE))
 	labelers$text[labelers$ticks==hexMax]<-paste(labelers$text[labelers$ticks==hexMax],"+",sep="")
 	write.table(ticks$text,'ticks.dat',sep="\t",quote=FALSE,row.names=FALSE,col.names=FALSE)
 	write.table(labelers$text,'labels.dat',sep="\t",quote=FALSE,row.names=FALSE,col.names=FALSE)
