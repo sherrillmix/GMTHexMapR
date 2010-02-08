@@ -209,101 +209,115 @@ readDouglas<-function(path=".",search="br[0-9][^.]+[0-9]\\.txt",ignoreErrors=FAL
 	#uniqueAnimals: Count unique occurrences of animal in a hex
 	#outlineCount: Draw an outline around all hexes with count >= outlineCount
 	#outlineCount: Draw an outline around enough hexs to cover propCount proportion of the data (overrides outlineCount)
+	#addPlus: Add a "+" to maximum label in scale (if using hexMax)
+	#animalWeights: Vector (with names of animals) of custom weighting for animals if proportionByAnimal is TRUE (e.g. monthly plots of proportion)
 	#...: Any other arguments to be passed to runGMT
 #Side Effects: 
 	#Generates various intermediary files (detailed in other functions) for use in plotting
 	#If histPrefix is not NULL writes hex count histograms to {histPrefix}_hist{XXX}.eps
 	#If daybrs contains column 'stateDep' generates animalTable.csv and dayTable.csv showing number of animal and animal-days from each state
+	#If proportionByAnimal writes weights for each animal to 'proportionWeights.csv'
 	#Generates postscript hexmap plot in outFile
 #Return: Vector of (lowXLim,highXlim,lowYLim,highYLim,maxHexCount) can be stored and passed as limits={return}, hardLimit={return} to further hexPlot calls to use the same range of latitude and longitude
-hexPlot<-function(daybrs,outFile,hexPerDegree=1,limits=NULL,extraCmd=NULL,landMaskCmd=NULL,hardLimit=NULL,hexMax=NULL,histPrefix=NULL,stateCount=FALSE,logCounts=FALSE,debug=FALSE,maxInterp=7,gmtDir="",contourFile=NULL,contourDepth=-200,dayScale=1,interp=1,addNumberToName=TRUE,allOneColor=NULL,proportion=FALSE,showMax=TRUE,proportionByAnimal=FALSE,seasonLimit=0,uniqueAnimals=FALSE,outlineCount=NULL,propCount=NULL,...){
+hexPlot<-function(daybrs,outFile,hexPerDegree=1,limits=NULL,extraCmd=NULL,landMaskCmd=NULL,hardLimit=NULL,hexMax=NULL,histPrefix=NULL,stateCount=FALSE,logCounts=FALSE,debug=FALSE,maxInterp=7,gmtDir="",contourFile=NULL,contourDepth=-200,dayScale=1,interp=1,addNumberToName=TRUE,allOneColor=NULL,proportion=FALSE,showMax=TRUE,proportionByAnimal=FALSE,seasonLimit=0,uniqueAnimals=FALSE,outlineCount=NULL,propCount=NULL,addPlus=TRUE,animalWeights=NULL,...){
 	#Interpolate between days
-	interps<-fill.missing.days(daybrs$animal,daybrs$rdate,daybrs$lat,daybrs$lon,maxInterp,interp)
-	colnames(interps)<-c('animal','rdate','lat','lon')
-	daybrs$interp<-FALSE
-	if (length(interps$animal)>0){
-		interps$interp<-TRUE
-		message(paste('Merging ',length(interps$animal),' interpolated animal-days with ',length(daybrs$interp),' original animal-days',sep=""))
-		finalbrs<-rbind(daybrs[,c('animal','rdate','lat','lon','interp')],interps)
-	}else finalbrs<-daybrs[,c('animal','rdate','lat','lon','interp')]
-	finalbrs<-finalbrs[order(finalbrs$animal,finalbrs$rdate),]
-	if ('stateDep' %in% colnames(daybrs)){
-		interpStates<-merge(finalbrs,unique(daybrs[,c('animal','stateDep')]))
-		if (length(interpStates$animal)!=length(finalbrs$animal)) stop(simpleError("Merging state deployments and post-interpolated data didn't work"))
-		if (is.null(limits)) append<-FALSE
-		else append<-TRUE
-		fileName<-gsub("\\.[^.]*$","",gsub("^[^/]*/","",outFile))
-		outTable<-as.data.frame(t(c(table(interpStates$stateDep))))
-		outTable<-cbind(fileName,outTable)
-		write.table(outTable,"dayTable.csv",append=append,sep=",",quote=TRUE,row.names=FALSE,col.names=!append)
-		outTable<-as.data.frame(t(c(table(unique(interpStates[,c('animal','stateDep')])$stateDep))))
-		outTable<-cbind(fileName,outTable)
-		write.table(outTable,"animalTable.csv",append=append,sep=",",quote=TRUE,row.names=FALSE,col.names=!append)
-		if (stateCount){
-			exCmds<-stateOutput(interpStates,limits=hardLimit)
-			extraCmd<-c(extraCmd,"psxy states.dat -R -JM -O -K -A -M>>","pstext stateStats.dat -JM -R -O -K>>",exCmds)	
+	if(nrow(daybrs)>0){
+		interps<-fill.missing.days(daybrs$animal,daybrs$rdate,daybrs$lat,daybrs$lon,maxInterp,interp)
+		colnames(interps)<-c('animal','rdate','lat','lon')
+		daybrs$interp<-FALSE
+		if (length(interps$animal)>0){
+			interps$interp<-TRUE
+			message(paste('Merging ',length(interps$animal),' interpolated animal-days with ',length(daybrs$interp),' original animal-days',sep=""))
+			finalbrs<-rbind(daybrs[,c('animal','rdate','lat','lon','interp')],interps)
+		}else finalbrs<-daybrs[,c('animal','rdate','lat','lon','interp')]
+		finalbrs<-finalbrs[order(finalbrs$animal,finalbrs$rdate),]
+		if ('stateDep' %in% colnames(daybrs)){
+			interpStates<-merge(finalbrs,unique(daybrs[,c('animal','stateDep')]))
+			if (length(interpStates$animal)!=length(finalbrs$animal)) stop(simpleError("Merging state deployments and post-interpolated data didn't work"))
+			if (is.null(limits)) append<-FALSE
+			else append<-TRUE
+			fileName<-gsub("\\.[^.]*$","",gsub("^[^/]*/","",outFile))
+			outTable<-as.data.frame(t(c(table(interpStates$stateDep))))
+			outTable<-cbind(fileName,outTable)
+			write.table(outTable,"dayTable.csv",append=append,sep=",",quote=TRUE,row.names=FALSE,col.names=!append)
+			outTable<-as.data.frame(t(c(table(unique(interpStates[,c('animal','stateDep')])$stateDep))))
+			outTable<-cbind(fileName,outTable)
+			write.table(outTable,"animalTable.csv",append=append,sep=",",quote=TRUE,row.names=FALSE,col.names=!append)
+			if (stateCount){
+				exCmds<-stateOutput(interpStates,limits=hardLimit)
+				extraCmd<-c(extraCmd,"psxy states.dat -R -JM -O -K -A -M>>","pstext stateStats.dat -JM -R -O -K>>",exCmds)	
+			}
 		}
-	}
-	if(proportionByAnimal){
-		seasonCount<-ave(finalbrs$lat,finalbrs$animal,FUN=length)
-		weights<-1/seasonCount*ifelse(seasonCount>=seasonLimit,1,seasonCount/seasonLimit)
+		if(proportionByAnimal){
+			if(!is.null(animalWeights)){
+				weights<-as.numeric(ave(finalbrs$animal,finalbrs$animal,FUN=function(x)animalWeights[x[1]]))
+			}else{
+				seasonCount<-ave(finalbrs$lat,finalbrs$animal,FUN=length)
+				weights<-1/seasonCount*ifelse(seasonCount>=seasonLimit,1,seasonCount/seasonLimit)
+			}
+			animalWeightsOut<-data.frame('weight'=weights[!duplicated(finalbrs$animal)],'animal'=finalbrs$animal[!duplicated(finalbrs$animal)])
+			write.csv(animalWeightsOut,'proportionWeights.csv',row.names=FALSE)
+		}else{
+			weights<-rep(1,nrow(finalbrs))
+		}
+		if(uniqueAnimals)uniqueCounter<-finalbrs$animal
+		else uniqueCounter<-NULL
+		newlimits<-makeHexs(finalbrs$lat,finalbrs$lon,file="hexs.dat",hexPerDegree=hexPerDegree,hardLimit=hardLimit,hexMax=hexMax,histPrefix=histPrefix,logCounts=logCounts,debug=debug,scale=dayScale,allOneColor=allOneColor,proportion=proportion,showMax=showMax,weights=weights,uniqueCounter=uniqueCounter,addPlus=addPlus)
+		hexs<-newlimits[[4]]
+		hexPoints<-newlimits[[5]]
+
+		newlimits<-unlist(newlimits[-c(4,5)])
+		
+		if(!is.null(outlineCount)|!is.null(propCount)){
+			if(!is.null(propCount)){
+				uniqueCounts<-unique(hexs$count)
+				countProps<-sapply(uniqueCounts,function(x,y)sum(hexs$count[hexs$count>=x])/y,sum(hexs$count))
+				outlineCount<-uniqueCounts[countProps==min(countProps[countProps>=propCount])]
+				message('Selected cutoff ',outlineCount,'. Covering ',sum(hexs$count>=outlineCount),' out of ',length(hexs$count),' hexs.')
+			}
+			if(!require(adehabitat))stop(simpleError('Outlining counts requires the package adehabitat'))
+
+			goodHexs<-hexs[hexs$count>=outlineCount,]
+			goodPoints<-hexPoints[hexPoints$count>=outlineCount&hexPoints$selector!=1,]
+			if(nrow(goodPoints)>0){
+				hexPolys<-by(goodPoints,rep(1:(nrow(goodPoints)/6),each=6),function(x)as(round(x[,c('coordx','coordy')],4),'gpc.poly'))
+				for(poly in hexPolys){
+					if(!exists('totalPoly'))totalPoly<-poly
+					else totalPoly<-union(totalPoly,poly)
+				}
+				polyOut<-c()
+				for(poly in totalPoly@pts){
+					if(!poly$hole)polyOut<-c(polyOut,'>',paste(poly$x,poly$y,sep='\t'))
+				}
+				writeLines(polyOut,'countOutline.dat')
+				landMaskCmd<-c(landMaskCmd,"psxy -R -JM -O -K -W4,0 -M -L <countOutline.dat>>")
+			}
+			#k=0 should be minimum convex hull
+			#homeRanges<-NNCH(unique(goodHexs[,c('x','y')]), a=5,duplicate='ignore')
+			#date();homeRanges<-NNCH(unique(goodPoints[,c('coordx','coordy')]), a=5,duplicate='ignore');date()
+			#polys<-homeRanges[[1]]$polygons
+			#getting 100% poly
+			#thisPoly<-polys[[length(polys)]]@pts
+			#polyOut<-c()
+			#for(j in thisPoly){
+			#	if(!j$hole)polyOut<-c('>',paste(j$x,j$y,sep='\t'))
+			#}
+			#writeLines(polyOut,'countOutline.dat',sep="\t",quote=FALSE,row.names=FALSE,col.names=FALSE)
+			#extraCmd<-c(extraCmd,"psxy -R -JM -O -K -W4,0 -G<countOutline.dat>>")
+
+			#write.table(homeRanges[,c('X','Y')],'countOutline.dat',sep="\t",quote=FALSE,row.names=FALSE,col.names=FALSE)
+
+			#extraCmd<-c(extraCmd,"psxy -R -JM -O -K -W4,0<countOutline.dat>>")
+			#homeRanges<-mcp(goodPoints[,c('coordx','coordy')],rep(1,nrow(goodPoints)),percent=100)
+
+			#write.table(homeRanges[,c('X','Y')],'countOutline.dat',sep="\t",quote=FALSE,row.names=FALSE,col.names=FALSE)
+			#extraCmd<-c(extraCmd,"psxy -R -JM -O -K -W4,0<countOutline.dat>>")
+		}
+		message('Hexs in plot sum to ',sum(hexs$count),'. Total data sum to ',sum(weights))
 	}else{
-		weights<-rep(1,nrow(finalbrs))
+		writeLines('','hexs.dat')
+		newlimits<-c(limits,0)
 	}
-	if(uniqueAnimals)uniqueCounter<-finalbrs$animal
-	else uniqueCounter<-NULL
-	newlimits<-makeHexs(finalbrs$lat,finalbrs$lon,file="hexs.dat",hexPerDegree=hexPerDegree,hardLimit=hardLimit,hexMax=hexMax,histPrefix=histPrefix,logCounts=logCounts,debug=debug,scale=dayScale,allOneColor=allOneColor,proportion=proportion,showMax=showMax,weights=weights,uniqueCounter=uniqueCounter)
-	hexs<-newlimits[[4]]
-	hexPoints<-newlimits[[5]]
-
-	newlimits<-unlist(newlimits[-c(4,5)])
-	
-	if(!is.null(outlineCount)|!is.null(propCount)){
-		if(!is.null(propCount)){
-			uniqueCounts<-unique(hexs$count)
-			countProps<-sapply(uniqueCounts,function(x,y)sum(hexs$count[hexs$count>=x])/y,sum(hexs$count))
-			outlineCount<-uniqueCounts[countProps==min(countProps[countProps>=propCount])]
-			message('Selected cutoff ',outlineCount,'. Covering ',sum(hexs$count>=outlineCount),' out of ',length(hexs$count),' hexs.')
-		}
-		if(!require(adehabitat))stop(simpleError('Outlining counts requires the package adehabitat'))
-
-		goodHexs<-hexs[hexs$count>=outlineCount,]
-		goodPoints<-hexPoints[hexPoints$count>=outlineCount&hexPoints$selector!=1,]
-		if(nrow(goodPoints)>0){
-			hexPolys<-by(goodPoints,rep(1:(nrow(goodPoints)/6),each=6),function(x)as(round(x[,c('coordx','coordy')],4),'gpc.poly'))
-			for(poly in hexPolys){
-				if(!exists('totalPoly'))totalPoly<-poly
-				else totalPoly<-union(totalPoly,poly)
-			}
-			polyOut<-c()
-			for(poly in totalPoly@pts){
-				if(!poly$hole)polyOut<-c(polyOut,'>',paste(poly$x,poly$y,sep='\t'))
-			}
-			writeLines(polyOut,'countOutline.dat')
-			landMaskCmd<-c(landMaskCmd,"psxy -R -JM -O -K -W4,0 -M -L <countOutline.dat>>")
-		}
-		#k=0 should be minimum convex hull
-		#homeRanges<-NNCH(unique(goodHexs[,c('x','y')]), a=5,duplicate='ignore')
-		#date();homeRanges<-NNCH(unique(goodPoints[,c('coordx','coordy')]), a=5,duplicate='ignore');date()
-		#polys<-homeRanges[[1]]$polygons
-		#getting 100% poly
-		#thisPoly<-polys[[length(polys)]]@pts
-		#polyOut<-c()
-		#for(j in thisPoly){
-		#	if(!j$hole)polyOut<-c('>',paste(j$x,j$y,sep='\t'))
-		#}
-		#writeLines(polyOut,'countOutline.dat',sep="\t",quote=FALSE,row.names=FALSE,col.names=FALSE)
-		#extraCmd<-c(extraCmd,"psxy -R -JM -O -K -W4,0 -G<countOutline.dat>>")
-
-		#write.table(homeRanges[,c('X','Y')],'countOutline.dat',sep="\t",quote=FALSE,row.names=FALSE,col.names=FALSE)
-
-		#extraCmd<-c(extraCmd,"psxy -R -JM -O -K -W4,0<countOutline.dat>>")
-		#homeRanges<-mcp(goodPoints[,c('coordx','coordy')],rep(1,nrow(goodPoints)),percent=100)
-
-		#write.table(homeRanges[,c('X','Y')],'countOutline.dat',sep="\t",quote=FALSE,row.names=FALSE,col.names=FALSE)
-		#extraCmd<-c(extraCmd,"psxy -R -JM -O -K -W4,0<countOutline.dat>>")
-	}
-	message('Hexs in plot sum to ',sum(hexs$count),'. Total data sum to ',sum(weights))
 	if(is.null(limits)) limits<-newlimits
 	outFileTemp<-strsplit(outFile,'\\.')[[1]]
 	animals<-length(unique(daybrs$animal))
@@ -520,6 +534,7 @@ fill.missing.days <- function(id,date,lat,lon,maxinterp=7,interp=1){
 	#showMax: show maximum on scale ticks?
 	#weights: Weight for each point
 	#uniqueCounter: If not NULL, count unique occurrences of uniqueCounter in a hex
+	#addPlus: Add a "plus" to maximum label in scale if using hexMax
 #Side Effects: 
 	#Writes lat/lon color information to file specified by file parameter in a format ready to use in GMT (but probably easy to parse by other programs too)
 	#If histPrefix is not NULL writes histograms to {histPrefix}_hist{XXX}.eps
@@ -527,7 +542,7 @@ fill.missing.days <- function(id,date,lat,lon,maxinterp=7,interp=1){
 	#Makes GMT color table scale.cpt for later use
 	#Calls makeTicks() which will output tick position for scalebar for later use
 #Return: Vector for use in further functions of (lowXLim,highXlim,lowYLim,highYLim,maxHexCount)
-makeHexs<-function(lat,lon,lonBase=-45,hexPerDegree=1,border=5,file="hexs.dat",hardLimit=NULL,hexMax=NULL,logCounts=FALSE,histPrefix=NULL,debug=FALSE,scale=1,allOneColor=NULL,proportion=FALSE,showMax=FALSE,weights=rep(1,length(lat)),uniqueCounter=NULL){
+makeHexs<-function(lat,lon,lonBase=-45,hexPerDegree=1,border=5,file="hexs.dat",hardLimit=NULL,hexMax=NULL,logCounts=FALSE,histPrefix=NULL,debug=FALSE,scale=1,allOneColor=NULL,proportion=FALSE,showMax=FALSE,weights=rep(1,length(lat)),uniqueCounter=NULL,addPlus=TRUE){
 	xlim <- range(lon)
 	xlim[1] <- round(xlim[1] - border)
 	xlim[2] <- round(xlim[2] + border)
@@ -618,12 +633,12 @@ makeHexs<-function(lat,lon,lonBase=-45,hexPerDegree=1,border=5,file="hexs.dat",h
 		}
 		if (is.null(hexMax))countcolors<-red2bluehsl(max(output$count),colormin)
 		else countcolors<-red2bluehsl(maximum,colormin)
-		cptoutput<-cbind(countcolors[1:(length(countcolors$count)-1),],countcolors[2:length(countcolors$count),])
+		cptoutput<-cbind(countcolors[1:max((nrow(countcolors)-1),1),],countcolors[min(2,nrow(countcolors)):length(countcolors$count),])
 		write.table(c("#	cpt file created by: R","#COLOR_MODEL = RGB","#"),'scale.cpt',sep="\t",quote=FALSE,row.names=FALSE,col.names=FALSE)
 		if (cptoutput[1,1]==0)cptoutput[1,1]<-0.00001	
 		write.table(cptoutput,'scale.cpt',sep="\t",quote=FALSE,row.names=FALSE,col.names=FALSE,append=TRUE)
 
-		makeTicks(output$count,logCounts,hexMax=hexMax,adjustScale=proportionScale,showMax=showMax)
+		makeTicks(output$count,logCounts,hexMax=hexMax,adjustScale=proportionScale,showMax=showMax,addPlus=addPlus)
 		numCheck<-length(output$x)
 		output<-merge(output,countcolors)
 		if (numCheck!=length(output$x)){
@@ -692,6 +707,7 @@ makeHexs<-function(lat,lon,lonBase=-45,hexPerDegree=1,border=5,file="hexs.dat",h
 	#min: Minimum count
 #Return: Data frame with rows 1:n and columns 'count','red','green','blue' (rgb columns in 0-255 scale) 
 red2bluehsl<-function (n,min=1){
+	if(min==n)return(data.frame('count'=n,'red'=255,'green'=0,blue=0))
 	count<-min:n
 	output<-data.frame(count)
 	output$red<-NA;output$green<-NA;output$blue<-NA;output$hue<-NA
@@ -750,12 +766,13 @@ hue2rgb<-function(v1,v2,vh){
 	#isLog: If true counts have previously been transformed round(log(counts)*100)
 	#showMax: Add the maximum hex count to the scale and filter out any labels too close to it
 	#hexMax: Counts have previously been capped at hexMax. Also adds "+" to {hexMax} label (e.g. "100+") if isLog is false
+	#addPlus: Add a "+" to {hexMax} label?
 	#addMin: If true makes sure the minimum scale value is at most 1 (0 if isLog is TRUE)
 #Side Effects:
 	#Writes tick positions to ticks.dat for later use in runGMT
 	#Writes labels and label positions to labels.dat for later use in runGMT
 #Return: Nothing
-makeTicks<-function(counts,isLog=FALSE,showMax=TRUE,hexMax=NULL,addMin=TRUE,adjustScale=1){
+makeTicks<-function(counts,isLog=FALSE,showMax=TRUE,hexMax=NULL,addMin=TRUE,adjustScale=1,addPlus=TRUE){
 	high<-.4
 	low<-.36
 	lower<-.33
@@ -809,7 +826,7 @@ makeTicks<-function(counts,isLog=FALSE,showMax=TRUE,hexMax=NULL,addMin=TRUE,adju
 	labelers<-ticks[ticks$ticks %in% labels&is.na(ticks$y)&!ticks$ticks %in% suppress,]
 	labelers$y<-.3
 	labelers$text<-paste(labelers$x,labelers$y,"10 0 1 CT",format(labelers$ticks,digits=2,drop0trailing=TRUE))
-	labelers$text[labelers$ticks==hexMax]<-paste(labelers$text[labelers$ticks==hexMax],"+",sep="")
+	if(addPlus)labelers$text[labelers$ticks==hexMax]<-paste(labelers$text[labelers$ticks==hexMax],"+",sep="")
 	write.table(ticks$text,'ticks.dat',sep="\t",quote=FALSE,row.names=FALSE,col.names=FALSE)
 	write.table(labelers$text,'labels.dat',sep="\t",quote=FALSE,row.names=FALSE,col.names=FALSE)
 }
