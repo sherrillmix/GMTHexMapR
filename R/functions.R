@@ -23,10 +23,22 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 # SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#' Functions to plot hexbins in GMT
+#'
+#' Produce a visual representation of position data with hexbins using the [General Mapping Tool](LINK)
+#'
+#' The main function is:
+#'      \describe{
+#'        \item{\code{\link{hexPlot}}:}{to produce a hexmap from a bunch of position data}
+#'      }
+#'
+#' And main helper functions are:
+#'      \describe{
+#'        \item{\code{\link{readDouglas}}:}{to read data filtered by the Douglas filter}
+#'      }
+#'
+#
 
-if (!require('date')|!require('hexbin')|!require('maps')){
-	stop(simpleError("This program requires data, hexbin and maps library"))
-}
 #---------------------------------------#
 #########################################
 ##############User Functions#############
