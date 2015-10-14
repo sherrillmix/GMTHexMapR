@@ -1,28 +1,3 @@
-# Copyright (c) 2008, Scott Sherrill-Mix
-# All rights reserved.
-#
-# Redistribution and use in source and binary forms, with or without
-# modification, are permitted provided that the following conditions are met:
-#     * Redistributions of source code must retain the above copyright
-#       notice, this list of conditions and the following disclaimer.
-#     * Redistributions in binary form must reproduce the above copyright
-#       notice, this list of conditions and the following disclaimer in the
-#       documentation and/or other materials provided with the distribution.
-#     * Neither the name of the organization nor the
-#       names of its contributors may be used to endorse or promote products
-#       derived from this software without specific prior written permission.
-#
-# THIS SOFTWARE IS PROVIDED BY SCOTT SHERRILL-MIX ``AS IS'' AND ANY
-# EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-# WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-# DISCLAIMED. IN NO EVENT SHALL <copyright holder> BE LIABLE FOR ANY
-# DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-# (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-# LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-# ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
 #' Functions to plot hexbins in GMT
 #'
 #' Produce a visual representation of position data with hexbins using the [General Mapping Tool](LINK)
@@ -37,26 +12,39 @@
 #'        \item{\code{\link{readDouglas}}:}{to read data filtered by the Douglas filter}
 #'      }
 #'
-#
+#' @docType package
+#' @name GMTHexBinR
+#' @author Scott Sherrill-Mix, \email{shescott@@upenn.edu}
+##' @examples
+NULL
 
-#---------------------------------------#
-#########################################
-##############User Functions#############
-###########The Important Stuff###########
-#########################################
-#---------------------------------------#
 
+#' Find contiguous ranges within a vector of indices
+#' 
+#' Take a vector of indices and returns ranges of contiguous regions.
+#'
+#' @param index Indices to be condensed e.g. from \code{\link{which}} or \code{\link{grep}}
+#'
+#' @return A data frame with columns: 
+#'      \describe{
+#'        \item{start:}{Start of a contiguous region}
+#'        \item{end:}{End of a contiguous region}
+#'      }
+#'
+#' @export
+#' 
+#' @examples
+#' indexToRange(c(1:10,11,14,16,17:20))
 
 #Function: brData<-readDouglas('datadir/',search="br[0-9][^.]+[0-9]\\.txt",extraColumns<-c('sex','adult'))
-#Parameters:
-	#path: System path to Douglas outputted files
-	#search: Regular expression to select files (defaults to br files)
-	#ignoreErrors: If true does not check for correct deployment information (lc94=DP)
-	#extraColumns: A vector of extra column names (present in the br files) that should also be returned (should be consistent over a day [e.g. deployday not time])
-	#assumeJuv: If true and br file is missing the 3 columns sex, stage and nester, will assume U, J, No respectively (A pretty specific convenience parameter for myself)
-	#twoWeekRemove: If true removes days < 14 days into the track
 #Side Effects: Sources code in filter.R after reading in br files for custom filtering (see example file)
-#Return: Data frame with median position for each day present in br file with columns c('animal', 'ptt', 'date', 'month', 'year', 'rdate', 'season', 'dir','file','deployday', extraColumns)
+#' @param path System path to Douglas outputted files
+#' @param search Regular expression to select files (defaults to br files)
+#' @param ignoreErrors If true does not check for correct deployment information (lc94=DP)
+#' @param extraColumns A vector of extra column names (present in the br files) that should also be returned (should be consistent over a day [e.g. deployday not time])
+#' @param assumeJuv If true and br file is missing the 3 columns sex, stage and nester, will assume U, J, No respectively (A pretty specific convenience parameter for myself)
+#' @param twoWeekRemove If true removes days < 14 days into the track
+#' @return Data frame with median position for each day present in br file with columns c('animal', 'ptt', 'date', 'month', 'year', 'rdate', 'season', 'dir','file','deployday', extraColumns)
 readDouglas<-function(path=".",search="br[0-9][^.]+[0-9]\\.txt",ignoreErrors=FALSE,extraColumns=NULL,assumeJuv=FALSE,twoWeekRemove=FALSE){
 	dayColumns<-c('animal','ptt','date','month','year',extraColumns)
 	wantedColumns<-c('animal','ptt','date','latitude','longitud','month','year','thetime','lc94',extraColumns)
@@ -194,44 +182,40 @@ readDouglas<-function(path=".",search="br[0-9][^.]+[0-9]\\.txt",ignoreErrors=FAL
 
 #Function: limits<-hexPlot(alldaybrs,'all.ps',hexPerDegree=2,hexMax=100)
 #Parameters:
-	#daybrs:Data frame containing 'animal','rdate','lat','lon' (e.g. the output from readDouglas)
-	#outFile: File location to write postscript map generated by GMT to
-	#hexPerDegree: How many hexs should fit horizontally in 1 degree of longitude at the equator
-	#limits: A vector of (southernMostLatitude,northernMostLatitude,westernMostLongitude,easternMostLongitude) for final hexMap or NULL to select automatically
-	#extraCmd: If not NULL, vector of system commands to run after other GMT commands and before scale (e.g. extra labels with pstext)
-	#landMaskCmd: If not NULL, vector of system commands to run after hex output and before pscoast (e.g. polygons over hexes)
-	#hardLimit: A vector of (southernMostLatitude,northernMostLatitude,westernMostLongitude,easternMostLongitude) for cropping hexs or NULL to not crop
-	#hexMax: Sets hexs with counts > hexMax to hexMax (for creating maps with the highest hex counts being something like "100+")
-	#histPrefix: If not NULL, create histogram files of hex counts in {histPrefix}_hist.ps 
-	#stateCount: If true, add commands generated by stateOutput() based on column 'stateDep' for deployment state of each animal (pretty specific command for this project but could be modified for other projects)
-	#logCounts:  If true, base color scale on logged hex counts
-	#debug: If true, browser() before returning from makeHexs()
-	#maxInterp: Maximum number of missing days to fill between two data points (missing days<=maxInterp)
-	#gmtDir: System directory for calling GMT functions (e.g. if pscoast is in /home/bin/ and /home/bin/ isn't in path then gmtDir="/home/bin/")
-	#contourFile: If not NULL, run pscontour at contourDepth meters based on this GMT elevation file
-	#contourDepth: Depth to draw contour in meters
-	#dayScale: Divide day totals by this number (useful for intervals less than 1 day)
-	#interp: # of positions per day to interpolate
-	#addNumberToName: Add number of days and turtles to file name?
-	#allOneColor: All hexes a single color e.g. '20/20/20'
-	#proportion: Divide counts by sum(counts)
-	#showMax: show maximum on scale ticks
-	#proportionByAnimal: weight points to add up to one for each animal
-	#seaonLimit: When using proportionByAnimal, if less than seasonLimit points then total animal weight = # points/seasonLimit otherwise 1
-	#uniqueAnimals: Count unique occurrences of animal in a hex
-	#outlineCount: Draw an outline around all hexes with count >= outlineCount
-	#outlineCount: Draw an outline around enough hexs to cover propCount proportion of the data (overrides outlineCount)
-	#addPlus: Add a "+" to maximum label in scale (if using hexMax)
-	#animalWeights: Vector (with names of animals) of custom weighting for animals if proportionByAnimal is TRUE (e.g. monthly plots of proportion)
-	#...: Any other arguments to be passed to runGMT
+#' @param daybrs:Data frame containing 'animal','rdate','lat','lon' (e.g. the output from readDouglas)
+#' @param outFile: File location to write postscript map generated by GMT to
+#' @param hexPerDegree: How many hexs should fit horizontally in 1 degree of longitude at the equator
+#' @param limits: A vector of (southernMostLatitude,northernMostLatitude,westernMostLongitude,easternMostLongitude) for final hexMap or NULL to select automatically
+#' @param extraCmd: If not NULL, vector of system commands to run after other GMT commands and before scale (e.g. extra labels with pstext)
+#' @param landMaskCmd: If not NULL, vector of system commands to run after hex output and before pscoast (e.g. polygons over hexes)
+#' @param hardLimit: A vector of (southernMostLatitude,northernMostLatitude,westernMostLongitude,easternMostLongitude) for cropping hexs or NULL to not crop
+#' @param hexMax: Sets hexs with counts > hexMax to hexMax (for creating maps with the highest hex counts being something like "100+")
+#' @param logCounts:  If true, base color scale on logged hex counts
+#' @param debug: If true, browser() before returning from makeHexs()
+#' @param maxInterp: Maximum number of missing days to fill between two data points (missing days<=maxInterp)
+#' @param gmtDir: System directory for calling GMT functions (e.g. if pscoast is in /home/bin/ and /home/bin/ isn't in path then gmtDir="/home/bin/")
+#' @param contourFile: If not NULL, run pscontour at contourDepth meters based on this GMT elevation file
+#' @param contourDepth: Depth to draw contour in meters
+#' @param dayScale: Divide day totals by this number (useful for intervals less than 1 day)
+#' @param interp: # of positions per day to interpolate
+#' @param addNumberToName: Add number of days and turtles to file name?
+#' @param proportion: Divide counts by sum(counts)
+#' @param showMax: show maximum on scale ticks
+#' @param proportionByAnimal: weight points to add up to one for each animal
+#' @param seaonLimit: When using proportionByAnimal, if less than seasonLimit points then total animal weight = # points/seasonLimit otherwise 1
+#' @param uniqueAnimals: Count unique occurrences of animal in a hex
+#' @param outlineCount: Draw an outline around all hexes with count >= outlineCount
+#' @param propCount: Draw an outline around enough hexs to cover propCount proportion of the data (overrides outlineCount)
+#' @param addPlus: Add a "+" to maximum label in scale (if using hexMax)
+#' @param animalWeights: Vector (with names of animals) of custom weighting for animals if proportionByAnimal is TRUE (e.g. monthly plots of proportion)
+#' @param ...: Any other arguments to be passed to runGMT
 #Side Effects: 
 	#Generates various intermediary files (detailed in other functions) for use in plotting
-	#If histPrefix is not NULL writes hex count histograms to {histPrefix}_hist{XXX}.eps
 	#If daybrs contains column 'stateDep' generates animalTable.csv and dayTable.csv showing number of animal and animal-days from each state
 	#If proportionByAnimal writes weights for each animal to 'proportionWeights.csv'
 	#Generates postscript hexmap plot in outFile
 #Return: Vector of (lowXLim,highXlim,lowYLim,highYLim,maxHexCount) can be stored and passed as limits={return}, hardLimit={return} to further hexPlot calls to use the same range of latitude and longitude
-hexPlot<-function(daybrs,outFile,hexPerDegree=1,limits=NULL,extraCmd=NULL,landMaskCmd=NULL,hardLimit=NULL,hexMax=NULL,histPrefix=NULL,stateCount=FALSE,logCounts=FALSE,debug=FALSE,maxInterp=7,gmtDir="",contourFile=NULL,contourDepth=-200,dayScale=1,interp=1,addNumberToName=TRUE,allOneColor=NULL,proportion=FALSE,showMax=TRUE,proportionByAnimal=FALSE,seasonLimit=0,uniqueAnimals=FALSE,outlineCount=NULL,propCount=NULL,addPlus=TRUE,animalWeights=NULL,...){
+hexPlot<-function(daybrs,outFile,hexPerDegree=1,limits=NULL,extraCmd=NULL,landMaskCmd=NULL,hardLimit=NULL,hexMax=NULL,logCounts=FALSE,debug=FALSE,maxInterp=7,gmtDir="",contourFile=NULL,contourDepth=-200,dayScale=1,interp=1,addNumberToName=TRUE,proportion=FALSE,showMax=TRUE,proportionByAnimal=FALSE,seasonLimit=0,uniqueAnimals=FALSE,outlineCount=NULL,propCount=NULL,addPlus=TRUE,animalWeights=NULL,...){
 	#Interpolate between days
 	if(nrow(daybrs)>0){
 		interps<-fill.missing.days(daybrs$animal,daybrs$rdate,daybrs$lat,daybrs$lon,maxInterp,interp)
@@ -255,10 +239,6 @@ hexPlot<-function(daybrs,outFile,hexPerDegree=1,limits=NULL,extraCmd=NULL,landMa
 			outTable<-as.data.frame(t(c(table(unique(interpStates[,c('animal','stateDep')])$stateDep))))
 			outTable<-cbind(fileName,outTable)
 			write.table(outTable,"animalTable.csv",append=append,sep=",",quote=TRUE,row.names=FALSE,col.names=!append)
-			if (stateCount){
-				exCmds<-stateOutput(interpStates,limits=hardLimit)
-				extraCmd<-c(extraCmd,"psxy states.dat -R -JM -O -K -A -M>>","pstext stateStats.dat -JM -R -O -K>>",exCmds)	
-			}
 		}
 		if(proportionByAnimal){
 			if(!is.null(animalWeights)){
@@ -274,7 +254,7 @@ hexPlot<-function(daybrs,outFile,hexPerDegree=1,limits=NULL,extraCmd=NULL,landMa
 		}
 		if(uniqueAnimals)uniqueCounter<-finalbrs$animal
 		else uniqueCounter<-NULL
-		newlimits<-makeHexs(finalbrs$lat,finalbrs$lon,file="hexs.dat",hexPerDegree=hexPerDegree,hardLimit=hardLimit,hexMax=hexMax,histPrefix=histPrefix,logCounts=logCounts,debug=debug,scale=dayScale,allOneColor=allOneColor,proportion=proportion,showMax=showMax,weights=weights,uniqueCounter=uniqueCounter,addPlus=addPlus)
+		newlimits<-makeHexs(finalbrs$lat,finalbrs$lon,file="hexs.dat",hexPerDegree=hexPerDegree,hardLimit=hardLimit,hexMax=hexMax,logCounts=logCounts,debug=debug,scale=dayScale,proportion=proportion,showMax=showMax,weights=weights,uniqueCounter=uniqueCounter,addPlus=addPlus)
 		hexs<-newlimits[[4]]
 		hexPoints<-newlimits[[5]]
 
@@ -362,7 +342,6 @@ hexPlot<-function(daybrs,outFile,hexPerDegree=1,limits=NULL,extraCmd=NULL,landMa
 	#limits: A vector of (southernMostLatitude,northernMostLatitude,westernMostLongitude,easternMostLongitude) for final hexMap or NULL to select automatically
 	#hardLimit: A vector of (southernMostLatitude,northernMostLatitude,westernMostLongitude,easternMostLongitude) for cropping hexs or NULL to not crop
 	#hexMax: Sets hexs with counts > hexMax to hexMax (for creating maps with the highest hex counts being something like "100+")
-	#stateCount: If true, add commands generated by stateOutput() based on column 'stateDep' for deployment state of each animal (pretty specific command for this project but could be modified for other projects)
 	#logCounts:  If true, base color scale on logged hex counts
 	#debug: If true, browser() before returning from makeHexs()
 	#hexPerDegree: How many hexs should fit horizontally in 1 degree of longitude at the equator
@@ -377,7 +356,7 @@ hexPlot<-function(daybrs,outFile,hexPerDegree=1,limits=NULL,extraCmd=NULL,landMa
 	#If daybrs contains column 'stateDep' generates animalTable.csv and dayTable.csv showing number of animal and animal-days from each state
 	#Generates postscript hexmap plots in outputPath
 #Return: Nothing
-plotSeason<-function(data,outputPath="",outputID="",limits=NULL,hardLimit=NULL,hexMax=NULL,stateCount=FALSE,logCounts=FALSE,debug=FALSE,hexPerDegree=4,seasons=4,maxInterp=7,contourFile=NULL,contourDepth=-200,extraCmd=NULL,...){
+plotSeason<-function(data,outputPath="",outputID="",limits=NULL,hardLimit=NULL,hexMax=NULL,logCounts=FALSE,debug=FALSE,hexPerDegree=4,seasons=4,maxInterp=7,contourFile=NULL,contourDepth=-200,extraCmd=NULL,...){
 	if (!seasons %in% c(2,4)) stop(simpleError("Only 2 and 4 seasons currently programmed"))
 	seasonNames<-c('Jan-Mar','Apr-Jun','Jul-Sep','Oct-Dec')
 	if (seasons==2){
@@ -402,7 +381,7 @@ plotSeason<-function(data,outputPath="",outputID="",limits=NULL,hardLimit=NULL,h
 		}
 		write.table(c(paste(lablon,lablat,"12 0 1 TL",seasonNames[i],sep=' ')),'month.dat',sep="\t",quote=FALSE,row.names=FALSE,col.names=FALSE)
 		command<- c(extraCmd,"pstext month.dat -JM -R -O -K -W255o>>")
-		hexPlot(daybrs,paste(outputPath,outputID,'season_',i,'.ps',sep=""),hexPerDegree=hexPerDegree,limits=limits,extraCmd=command, hardLimit=hardLimit,hexMax=hexMax,stateCount=stateCount,logCounts=logCounts,debug=debug,maxInterp=maxInterp,contourFile=contourFile,contourDepth=contourDepth,...)
+		hexPlot(daybrs,paste(outputPath,outputID,'season_',i,'.ps',sep=""),hexPerDegree=hexPerDegree,limits=limits,extraCmd=command, hardLimit=hardLimit,hexMax=hexMax,logCounts=logCounts,debug=debug,maxInterp=maxInterp,contourFile=contourFile,contourDepth=contourDepth,...)
 	}
 }
 
@@ -538,10 +517,8 @@ fill.missing.days <- function(id,date,lat,lon,maxinterp=7,interp=1){
 	#hardLimit: A vector of (southernMostLatitude,northernMostLatitude,westernMostLongitude,easternMostLongitude) (or NULL) to filter hexs 
 	#hexMax: Sets hexs with counts > hexMax to hexMax (for creating maps with the highest hex counts being something like "100+")
 	#logCounts: If true base color scale on logged hex counts
-	#histPrefix: If not NULL, create histogram files of hex counts in {histPrefix}_hist.ps
 	#debug: If true, browser() before returning
 	#scale: Divide day totals by this number (useful for intervals less than 1 day)
-	#allOneColor: Make all hexes a single color e.g. '20/20/20'
 	#proportion: Divide counts by sum(counts)
 	#showMax: show maximum on scale ticks?
 	#weights: Weight for each point
@@ -549,12 +526,11 @@ fill.missing.days <- function(id,date,lat,lon,maxinterp=7,interp=1){
 	#addPlus: Add a "plus" to maximum label in scale if using hexMax
 #Side Effects: 
 	#Writes lat/lon color information to file specified by file parameter in a format ready to use in GMT (but probably easy to parse by other programs too)
-	#If histPrefix is not NULL writes histograms to {histPrefix}_hist{XXX}.eps
 	#Makes test map of hex positions and data in testhex.eps
 	#Makes GMT color table scale.cpt for later use
 	#Calls makeTicks() which will output tick position for scalebar for later use
 #Return: Vector for use in further functions of (lowXLim,highXlim,lowYLim,highYLim,maxHexCount)
-makeHexs<-function(lat,lon,lonBase=-45,hexPerDegree=1,border=5,file="hexs.dat",hardLimit=NULL,hexMax=NULL,logCounts=FALSE,histPrefix=NULL,debug=FALSE,scale=1,allOneColor=NULL,proportion=FALSE,showMax=FALSE,weights=rep(1,length(lat)),uniqueCounter=NULL,addPlus=TRUE){
+makeHexs<-function(lat,lon,lonBase=-45,hexPerDegree=1,border=5,file="hexs.dat",hardLimit=NULL,hexMax=NULL,logCounts=FALSE,debug=FALSE,scale=1,proportion=FALSE,showMax=FALSE,weights=rep(1,length(lat)),uniqueCounter=NULL,addPlus=TRUE){
 	xlim <- range(lon)
 	xlim[1] <- round(xlim[1] - border)
 	xlim[2] <- round(xlim[2] + border)
@@ -584,19 +560,6 @@ makeHexs<-function(lat,lon,lonBase=-45,hexPerDegree=1,border=5,file="hexs.dat",h
 		points(lon,lat,cex=.1,col="grey")
 		map(add=TRUE)
 	dev.off()
-	if (!is.null(histPrefix)){
-		postscript(paste(histPrefix,"_hist.eps",sep=""),horizontal=FALSE)
-			hist(bin@count,breaks=30,xlab="Turtle-Days in Hex",main=paste(hexPerDegree,"Hexs Per Degree"))
-		dev.off()
-		postscript(paste(histPrefix,"_under100hist.eps",sep=""),horizontal=FALSE)
-			hist(bin@count[bin@count<=100],breaks=100,xlab="Turtle-Days in Hex",main=paste(hexPerDegree,"Hexs Per Degree (Under 100 Days)"))
-		dev.off()
-		if (any(bin@count>100)){
-			postscript(paste(histPrefix,"_over100hist.eps",sep=""),horizontal=FALSE)
-				hist(bin@count[bin@count>100],breaks=100,xlab="Turtle-Days in Hex",main=paste(hexPerDegree,"Hexs Per Degree (Over 100 Days)"))
-			dev.off()
-		}
-	}
 
 	proportionScale<-1
 	if(!is.null(uniqueCounter)) weightSum<-tapply(uniqueCounter,bin@cID,function(x)length(unique(x)))
@@ -666,8 +629,7 @@ makeHexs<-function(lat,lon,lonBase=-45,hexPerDegree=1,border=5,file="hexs.dat",h
 		#Color
 		selector<-stackoutput$selector==1
 		#Color
-		if(!is.null(allOneColor)) stackoutput[selector,'text']<-paste(">-W0 -G",allOneColor,sep="")
-		else stackoutput[selector,'text']<-paste(">-W1/255 -G",stackoutput[selector,'red'],"/",stackoutput[selector,'green'],"/",stackoutput[selector,'blue'],sep="")
+		stackoutput[selector,'text']<-paste(">-W1/255 -G",stackoutput[selector,'red'],"/",stackoutput[selector,'green'],"/",stackoutput[selector,'blue'],sep="")
 		#Top
 		selector<-stackoutput$selector==2
 		stackoutput[selector,'coordx']<-stackoutput[selector,'topx']
