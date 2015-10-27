@@ -25,11 +25,9 @@ NULL
 #' @param search Regular expression to select files (defaults to br files)
 #' @param ignoreErrors If true does not check for correct deployment information (lc94=DP)
 #' @param extraColumns A vector of extra column names (present in the br files) that should also be returned (should be consistent over a day [e.g. deployday not time])
-#' @param assumeJuv If true and br file is missing the 3 columns sex, stage and nester, will assume U, J, No respectively (A pretty specific convenience parameter for myself)
-#' @param twoWeekRemove If true removes days < 14 days into the track
 #' @return Data frame with median position for each day present in br file with columns c('animal', 'ptt', 'date', 'month', 'year', 'rdate', 'season', 'dir','file','deployday', extraColumns)
 #' @export
-readDouglas<-function(path=".",search="br[0-9][^.]+[0-9]\\.txt",ignoreErrors=FALSE,extraColumns=NULL,assumeJuv=FALSE,twoWeekRemove=FALSE){
+readDouglas<-function(path=".",search="br[0-9][^.]+[0-9]\\.txt",ignoreErrors=FALSE,extraColumns=NULL,twoWeekRemove=FALSE){
 	dayColumns<-c('animal','ptt','date','month','year',extraColumns)
 	wantedColumns<-c('animal','ptt','date','latitude','longitud','month','year','thetime','lc94',extraColumns)
 	#Read in br files
@@ -45,13 +43,6 @@ readDouglas<-function(path=".",search="br[0-9][^.]+[0-9]\\.txt",ignoreErrors=FAL
 		thisFile=basename(files[i])
 		thisBr<-read.table(files[i],header=TRUE,sep=",",as.is=TRUE)
 		missingCol<-wantedColumns[!(wantedColumns %in% colnames(thisBr))]
-		if (identical(missingCol,c('sex','stage','nester'))&assumeJuv){
-			message(paste("Assuming sex is U and stage is J for br and nester is No",thisFile))
-			thisBr$sex<-"U"
-			thisBr$stage<-"J"
-			thisBr$nester<-"No"
-			missingCol=NULL
-		}
 		if(length(missingCol)>0){
 			thisBr<-read.table(files[i],header=TRUE,sep="\t",as.is=TRUE)
 			if(!all(wantedColumns %in% colnames(thisBr))){
@@ -107,15 +98,12 @@ readDouglas<-function(path=".",search="br[0-9][^.]+[0-9]\\.txt",ignoreErrors=FAL
 
 	#Remove first two weeks if desired
 	brs$deployday<-brs$rdate-brs$depdate
-	if (twoWeekRemove){
-		brs<-brs[brs$deployday>=14,]
-	}
 
 	brs$season<-NA
-	brs[brs$month >= 1 | brs$month <= 3,'season']<-1;
-	brs[brs$month >= 4 & brs$month <= 6,'season']<-2;
-	brs[brs$month >= 7 & brs$month <= 9, 'season']<-3;
-	brs[brs$month >= 9 & brs$month <= 12, 'season']<-4;
+	brs[brs$month >= 1 & brs$month < 4,'season']<-1;
+	brs[brs$month >= 4 & brs$month < 7,'season']<-2;
+	brs[brs$month >= 7 & brs$month < 9, 'season']<-3;
+	brs[brs$month >= 10 & brs$month < 13, 'season']<-4;
 
 	brs$animalDate<-paste(brs$animal,"_",as.numeric(brs$rdate),sep="")
 	avglon<-tapply(brs$longitud,brs$animalDate,median)
@@ -134,27 +122,6 @@ readDouglas<-function(path=".",search="br[0-9][^.]+[0-9]\\.txt",ignoreErrors=FAL
 	daybrs$lat<-avglat
 	daybrs$lon<-avglon
 
-	#Specific for fixing sex stage and nester
-	if (all(c('sex','stage','nester') %in% wantedColumns)){
-		daybrs$convertSex<-NA
-		daybrs$convertSex[daybrs$sex %in% c('m','M')]<-"M"
-		daybrs$convertSex[daybrs$sex %in% c('F','FALSE','f')]<-"F"
-		daybrs$convertSex[daybrs$sex %in% c('U','UN','u')]<-"U"
-		daybrs$convertStage<-NA
-		daybrs$convertStage[daybrs$stage %in% c('Adult','adult','A')]<-"A"
-		daybrs$convertStage[daybrs$stage %in% c('immature','juv','J')]<-"J"
-		daybrs$convertStage[daybrs$stage %in% c('U','u','uk')]<-"U"
-		daybrs$convertNester<-NA
-		daybrs$convertNester[daybrs$nester %in% c('N','no','n','No')]<-"N"
-		daybrs$convertNester[daybrs$nester %in% c('Y','ye','y')]<-"Y"
-		daybrs$convertNester[daybrs$nester %in% c('U','uk')]<-"U"
-		if (any(is.na(daybrs$convertSex)))stop(simpleError("Some sexs not understood"))
-		if (any(is.na(daybrs$convertStage)))stop(simpleError("Some stages not understood"))
-		if (any(is.na(daybrs$convertNester)))stop(simpleError("Some nesters not understood"))
-		daybrs$sex<-daybrs$convertSex
-		daybrs$stage<-daybrs$convertStage
-		daybrs$nester<-daybrs$convertNester
-	}
 	return(daybrs)
 }
 
