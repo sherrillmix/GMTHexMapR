@@ -32,12 +32,8 @@ NULL
 readDouglas<-function(path=".",search="br[0-9][^.]+[0-9]\\.txt",ignoreErrors=FALSE,extraColumns=NULL,assumeJuv=FALSE,twoWeekRemove=FALSE){
 	dayColumns<-c('animal','ptt','date','month','year',extraColumns)
 	wantedColumns<-c('animal','ptt','date','latitude','longitud','month','year','thetime','lc94',extraColumns)
-	homepath<-getwd()
-	print(path)
 	#Read in br files
-	setwd(path)
-	files<-list.files(full.names=TRUE,recursive=TRUE)
-	files<-files[grep(search,files)]
+	files<-list.files(path,pattern=search,full.names=TRUE,recursive=TRUE)
 
 	if (length(files)==0){
 		stop(simpleError(paste("Please put some files matching ",search," in ",path,sep="")))
@@ -45,9 +41,8 @@ readDouglas<-function(path=".",search="br[0-9][^.]+[0-9]\\.txt",ignoreErrors=FAL
 
 	found<-FALSE
 	for (i in 1:length(files)) {
-		thisDir=strsplit(files[i],'/')[[1]]
-		thisFile=thisDir[length(thisDir)]
-		thisDir=thisDir[length(thisDir)-1]
+		thisDir=dirname(files[i])
+		thisFile=basename(files[i])
 		thisBr<-read.table(files[i],header=TRUE,sep=",",as.is=TRUE)
 		missingCol<-wantedColumns[!(wantedColumns %in% colnames(thisBr))]
 		if (identical(missingCol,c('sex','stage','nester'))&assumeJuv){
@@ -75,7 +70,6 @@ readDouglas<-function(path=".",search="br[0-9][^.]+[0-9]\\.txt",ignoreErrors=FAL
 		}
 		
 	}
-	setwd(homepath)
 
 	#filter out any crappy ones or custom 
 	if(file.exists('filter.R')){
