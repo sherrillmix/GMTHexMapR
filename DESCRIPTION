@@ -9,6 +9,6 @@ Description: A function to take position data, generate hexbins and display them
 License: GPL (>=2)
 LazyData: TRUE
 Suggests: testthat
-Depends: R (>= 3.1.0), data, hexbin, maps
+Depends: R (>= 3.1.0), date, hexbin, maps
 
 
