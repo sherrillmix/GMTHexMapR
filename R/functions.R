@@ -214,26 +214,6 @@ hexPlot<-function(daybrs,outFile,hexPerDegree=1,limits=NULL,extraCmd=NULL,landMa
 				writeLines(polyOut,'countOutline.dat')
 				landMaskCmd<-c(landMaskCmd,"psxy -R -JM -O -K -W4,0 -M -L <countOutline.dat>>")
 			}
-			#k=0 should be minimum convex hull
-			#homeRanges<-NNCH(unique(goodHexs[,c('x','y')]), a=5,duplicate='ignore')
-			#date();homeRanges<-NNCH(unique(goodPoints[,c('coordx','coordy')]), a=5,duplicate='ignore');date()
-			#polys<-homeRanges[[1]]$polygons
-			#getting 100% poly
-			#thisPoly<-polys[[length(polys)]]@pts
-			#polyOut<-c()
-			#for(j in thisPoly){
-			#	if(!j$hole)polyOut<-c('>',paste(j$x,j$y,sep='\t'))
-			#}
-			#writeLines(polyOut,'countOutline.dat',sep="\t",quote=FALSE,row.names=FALSE,col.names=FALSE)
-			#extraCmd<-c(extraCmd,"psxy -R -JM -O -K -W4,0 -G<countOutline.dat>>")
-
-			#write.table(homeRanges[,c('X','Y')],'countOutline.dat',sep="\t",quote=FALSE,row.names=FALSE,col.names=FALSE)
-
-			#extraCmd<-c(extraCmd,"psxy -R -JM -O -K -W4,0<countOutline.dat>>")
-			#homeRanges<-mcp(goodPoints[,c('coordx','coordy')],rep(1,nrow(goodPoints)),percent=100)
-
-			#write.table(homeRanges[,c('X','Y')],'countOutline.dat',sep="\t",quote=FALSE,row.names=FALSE,col.names=FALSE)
-			#extraCmd<-c(extraCmd,"psxy -R -JM -O -K -W4,0<countOutline.dat>>")
 		}
 		message('Hexs in plot sum to ',sum(hexs$count),'. Total data sum to ',sum(weights))
 	}else{
