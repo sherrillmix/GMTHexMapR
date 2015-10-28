@@ -59,7 +59,6 @@ readDouglas<-function(path=".",search="br[0-9][^.]+[0-9]\\.txt",ignoreErrors=FAL
 			brs<-thisBr
 			found<-TRUE
 		}
-		
 	}
 
 	#filter out any crappy ones or custom 
@@ -96,7 +95,6 @@ readDouglas<-function(path=".",search="br[0-9][^.]+[0-9]\\.txt",ignoreErrors=FAL
 		stop(simpleError(paste(length(problemAnimals)," deployments not at start of track after sorting by animal, date and time (",paste(problemAnimals,collape=" "),"). Please fix this.",sep="")))
 	}
 
-	#Remove first two weeks if desired
 	brs$deployday<-brs$rdate-brs$depdate
 
 	brs$season<-NA
@@ -110,7 +108,7 @@ readDouglas<-function(path=".",search="br[0-9][^.]+[0-9]\\.txt",ignoreErrors=FAL
 	avglat<-tapply(brs$latitude,brs$animalDate,median)
 	daybrs<-unique(brs[,c(dayColumns,'rdate','season','animalDate','dir','file','deployday')])
 	if(length(daybrs$animalDate)!=length(avglat)|length(daybrs$animalDate)!=length(avglon)){
-		stop(simpleError(paste("Somehow the number of avgerage lats or lons does not match the number of animals and days.",sep="")))
+		stop(simpleError(paste("Somehow the number of average lats or lons does not match the number of animals and days.",sep="")))
 	}
 	#Not actually necessary but better safe...
 	daybrs<-daybrs[order(daybrs$animalDate),]
