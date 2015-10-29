@@ -26,8 +26,9 @@ NULL
 #' @param ignoreErrors If true does not check for correct deployment information (lc94=DP)
 #' @param extraColumns A vector of extra column names (present in the br files) that should also be returned (should be consistent over a day [e.g. deployday not time])
 #' @return Data frame with median position for each day present in br file with columns c('animal', 'ptt', 'date', 'month', 'year', 'rdate', 'season', 'dir','file','deployday', extraColumns)
+#' @import date
 #' @export
-readDouglas<-function(path=".",search="br[0-9][^.]+[0-9]\\.txt",ignoreErrors=FALSE,extraColumns=NULL,twoWeekRemove=FALSE){
+readDouglas<-function(path=".",search="br[0-9][^.]+[0-9]\\.txt",ignoreErrors=FALSE,extraColumns=NULL){
 	dayColumns<-c('animal','ptt','date','month','year',extraColumns)
 	wantedColumns<-c('animal','ptt','date','latitude','longitud','month','year','thetime','lc94',extraColumns)
 	#Read in br files
@@ -61,13 +62,6 @@ readDouglas<-function(path=".",search="br[0-9][^.]+[0-9]\\.txt",ignoreErrors=FAL
 		}
 	}
 
-	#filter out any crappy ones or custom 
-	if(file.exists('filter.R')){
-		message('NOTE: Filtering data frame "brs" based on code in filter.R')
-		source('filter.R')
-		brs<-brFilter(brs)
-	}else message('If you would like to filter any points out of the total br file (or add points from non standard files) put R code modifying the data frame "brs" into filter.R')
-
 	#Remove any without lat or lon
 	brs<-brs[!is.na(brs$latitude)&!is.na(brs$longitud),]
 
@@ -80,7 +74,7 @@ readDouglas<-function(path=".",search="br[0-9][^.]+[0-9]\\.txt",ignoreErrors=FAL
 		stop(simpleError(paste("Unique animal ids and animal ids from deployments do not match. Please fix this.",sep="")))
 	}
 	message(paste('Found ',length(ptts),' unique animals',sep=''))
-	brs$rdate<-as.date(brs$date)
+	brs$rdate<-date::as.date(brs$date)
 	dps<-brs[brs$lc=="DP",c('animal','rdate')]
 	colnames(dps)<-c('animal','depdate')
 	brs<-merge(brs,dps,all=TRUE)
@@ -149,7 +143,7 @@ readDouglas<-function(path=".",search="br[0-9][^.]+[0-9]\\.txt",ignoreErrors=FAL
 #' @param proportion Divide counts by sum(counts)
 #' @param showMax show maximum on scale ticks
 #' @param proportionByAnimal weight points to add up to one for each animal
-#' @param seaonLimit When using proportionByAnimal, if less than seasonLimit points then total animal weight = # points/seasonLimit otherwise 1
+#' @param seasonLimit When using proportionByAnimal, if less than seasonLimit points then total animal weight = # points/seasonLimit otherwise 1
 #' @param uniqueAnimals Count unique occurrences of animal in a hex
 #' @param outlineCount Draw an outline around all hexes with count >= outlineCount
 #' @param propCount Draw an outline around enough hexs to cover propCount proportion of the data (overrides outlineCount)
@@ -274,11 +268,12 @@ systemOut<-function(...,debug=FALSE){
 #' Fill in missing days
 #'
 #' Interpolate between known positions to fill in missing days
-#' @param id Vector of length N of animal identifiers (so the last day of one animal is interpolated to the first day of the next)
+#' @param id Vector of length N of animal identifiers (so the last day of one animal is not interpolated to the first day of the next)
 #' @param date Vector of length N of either an rdate or some other integer
 #' @param lat Vector of length N of latitudes
 #' @param lon Vector of length N of longitudes
 #' @param maxinterp Maximum number of missing days to fill between two data points (<=maxinterp)
+#' @param interp number of positions per day to interpolate
 #' @return Data frame of interpolated date/positions with columns id, date, lat, lon (note: original positions are not returned)
 fill.missing.days <- function(id,date,lat,lon,maxinterp=7,interp=1){
 	if (length(lat)!=length(date)|length(date)!=length(lon)|length(date)!=length(id)){
@@ -335,6 +330,7 @@ fill.missing.days <- function(id,date,lat,lon,maxinterp=7,interp=1){
 #' @param weights Weight for each point
 #' @param uniqueCounter If not NULL, count unique occurrences of uniqueCounter in a hex
 #' @param addPlus Add a "plus" to maximum label in scale if using hexMax
+#' @import maps hexbin
 #' @return Vector for use in further functions of (lowXLim,highXlim,lowYLim,highYLim,maxHexCount)
 makeHexs<-function(lat,lon,lonBase=-45,hexPerDegree=1,border=5,file="hexs.dat",hardLimit=NULL,hexMax=NULL,logCounts=FALSE,debug=FALSE,scale=1,proportion=FALSE,showMax=FALSE,weights=rep(1,length(lat)),uniqueCounter=NULL,addPlus=TRUE){
 	xlim <- range(lon)
@@ -364,7 +360,7 @@ makeHexs<-function(lat,lon,lonBase=-45,hexPerDegree=1,border=5,file="hexs.dat",h
 	postscript("testhex.eps")
 		plot(cellxy$x/cos(cellxy$y/180*pi)+lonBase,cellxy$y,cex=.25,col="red",ylab="Latitude",xlab="Longitude",xlim=c(-180,180),ylim=c(-70,70))
 		points(lon,lat,cex=.1,col="grey")
-		map(add=TRUE)
+		maps::map(add=TRUE)
 	dev.off()
 
 	proportionScale<-1
@@ -713,6 +709,9 @@ runGMT<-function(limits,outFile="output.ps",width=6,dataFile="hexs.dat",gmtDir="
 #' @param scaleLabel title of scale
 #' @param margin space for margin on either side of scale
 #' @param scaleHeight height of scale
+#' @param xpos Shift plot origin right xpos inches (balance with margin and scaleHeight)
+#' @param ypos Shift plot origin up ypos inches (balance with margin and scaleHeight)
+#' @param gmtDir System directory for calling GMT functions (e.g. if pscoast is in /home/bin/ and /home/bin/ isn't in path then gmtDir="/home/bin/")
 #' @return Invisible NULL
 makeScale<-function(width,outFile,scaleLabel="Days Turtles Recorded in Hex",margin=1,scaleHeight=.8,xpos=margin/2,ypos=-scaleHeight*1.5,gmtDir=''){
 		scaleWidth<-width-margin

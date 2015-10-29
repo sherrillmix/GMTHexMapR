@@ -18,6 +18,12 @@ makeScale(width, outFile, scaleLabel = "Days Turtles Recorded in Hex",
 \item{margin}{space for margin on either side of scale}
 
 \item{scaleHeight}{height of scale}
+
+\item{xpos}{Shift plot origin right xpos inches (balance with margin and scaleHeight)}
+
+\item{ypos}{Shift plot origin up ypos inches (balance with margin and scaleHeight)}
+
+\item{gmtDir}{System directory for calling GMT functions (e.g. if pscoast is in /home/bin/ and /home/bin/ isn't in path then gmtDir="/home/bin/")}
 }
 \value{
 Invisible NULL

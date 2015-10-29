@@ -7,7 +7,7 @@
 fill.missing.days(id, date, lat, lon, maxinterp = 7, interp = 1)
 }
 \arguments{
-\item{id}{Vector of length N of animal identifiers (so the last day of one animal is interpolated to the first day of the next)}
+\item{id}{Vector of length N of animal identifiers (so the last day of one animal is not interpolated to the first day of the next)}
 
 \item{date}{Vector of length N of either an rdate or some other integer}
 
@@ -16,9 +16,11 @@ fill.missing.days(id, date, lat, lon, maxinterp = 7, interp = 1)
 \item{lon}{Vector of length N of longitudes}
 
 \item{maxinterp}{Maximum number of missing days to fill between two data points (<=maxinterp)}
+
+\item{interp}{number of positions per day to interpolate}
 }
 \value{
-Data frame of interpolated date/positions with columns id, data, lat, lon (note: original positions are not returned)
+Data frame of interpolated date/positions with columns id, date, lat, lon (note: original positions are not returned)
 }
 \description{
 Interpolate between known positions to fill in missing days

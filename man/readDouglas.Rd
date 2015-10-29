@@ -5,7 +5,7 @@
 \title{Read in Douglas filtered files}
 \usage{
 readDouglas(path = ".", search = "br[0-9][^.]+[0-9]\\\\.txt",
-  ignoreErrors = FALSE, extraColumns = NULL, twoWeekRemove = FALSE)
+  ignoreErrors = FALSE, extraColumns = NULL)
 }
 \arguments{
 \item{path}{System path to directory containing Douglas outputted files}
