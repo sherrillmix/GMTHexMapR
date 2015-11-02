@@ -1,4 +1,4 @@
-Package: GMTHexMap
+Package: GMTHexMapR
 Type: Package
 Title: GMTHexMap: Generate a hexmap from position data
 Version: 0.1
