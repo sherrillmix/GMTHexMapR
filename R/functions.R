@@ -317,8 +317,9 @@ fill.missing.days <- function(id,date,lat,lon,maxinterp=7,interp=1){
 #' Calls makeTicks() which will output tick position for scalebar for later use
 #' @param lat A vector of latitudes of length N
 #' @param lon A vector of longitudes of length N
+#' @param lonBase Longitude for centering calculations 
 #' @param hexPerDegree How many hexs should fit horizontally in 1 degree of longitude at the equator
-#' @param borders How many degrees of space to leave around the hexs (if hardLimit is NULL)
+#' @param border How many degrees of space to leave around the hexs (if hardLimit is NULL)
 #' @param file File to lat/lon of hex positions to
 #' @param hardLimit A vector of (southernMostLatitude,northernMostLatitude,westernMostLongitude,easternMostLongitude) (or NULL) to filter hexs 
 #' @param hexMax Sets hexs with counts > hexMax to hexMax (for creating maps with the highest hex counts being something like "100+")
@@ -544,6 +545,7 @@ hue2rgb<-function(v1,v2,vh){
 #' @param isLog If true counts have previously been transformed round(log(counts)*100)
 #' @param showMax Add the maximum hex count to the scale and filter out any labels too close to it
 #' @param hexMax Counts have previously been capped at hexMax. Also adds "+" to {hexMax} label (e.g. "100+") if isLog is false
+#' @param adjustScale Multiply the scale by this e.g. adjustScale=100 would give percent
 #' @param addPlus Add a "+" to {hexMax} label?
 #' @param addMin If true makes sure the minimum scale value is at most 1 (0 if isLog is TRUE)
 #' @return Invisible NULL

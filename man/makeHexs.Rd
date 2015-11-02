@@ -14,7 +14,11 @@ makeHexs(lat, lon, lonBase = -45, hexPerDegree = 1, border = 5,
 
 \item{lon}{A vector of longitudes of length N}
 
+\item{lonBase}{Longitude for centering calculations}
+
 \item{hexPerDegree}{How many hexs should fit horizontally in 1 degree of longitude at the equator}
+
+\item{border}{How many degrees of space to leave around the hexs (if hardLimit is NULL)}
 
 \item{file}{File to lat/lon of hex positions to}
 
@@ -37,8 +41,6 @@ makeHexs(lat, lon, lonBase = -45, hexPerDegree = 1, border = 5,
 \item{uniqueCounter}{If not NULL, count unique occurrences of uniqueCounter in a hex}
 
 \item{addPlus}{Add a "plus" to maximum label in scale if using hexMax}
-
-\item{borders}{How many degrees of space to leave around the hexs (if hardLimit is NULL)}
 }
 \value{
 Vector for use in further functions of (lowXLim,highXlim,lowYLim,highYLim,maxHexCount)

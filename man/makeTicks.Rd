@@ -18,6 +18,8 @@ makeTicks(counts, isLog = FALSE, showMax = TRUE, hexMax = NULL,
 
 \item{addMin}{If true makes sure the minimum scale value is at most 1 (0 if isLog is TRUE)}
 
+\item{adjustScale}{Multiply the scale by this e.g. adjustScale=100 would give percent}
+
 \item{addPlus}{Add a "+" to {hexMax} label?}
 }
 \value{
