@@ -39,6 +39,8 @@ runGMT(limits, outFile = "output.ps", width = 6, dataFile = "hexs.dat",
 
 \item{scaleLabel}{Label for scale if scale is TRUE}
 
+\item{contourPen}{A string or vector of strings specifying pen attributes for grd contour to trace the contour file}
+
 \item{concatenate}{Add output to existing file?}
 
 \item{xpos}{Shift plot origin right xpos inches}
@@ -48,6 +50,8 @@ runGMT(limits, outFile = "output.ps", width = 6, dataFile = "hexs.dat",
 \item{posOptions}{Options for position (e.g. -O)}
 
 \item{gmtsetOptions}{Options for gmtset}
+
+\item{annotateBorders}{A string like "WSen" specifying which borders to annotate as in psbasemap}
 
 \item{borderColor}{color for border of hexes}
 

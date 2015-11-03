@@ -1,11 +1,11 @@
 Package: GMTHexMapR
 Type: Package
-Title: GMTHexMap: Generate a hexmap from position data
+Title: Generate a hexmap from position data
 Version: 0.1
 Date: 2015-10-08
 Author: Scott Sherrill-Mix
 Maintainer: Scott Sherrill-Mix <sherrillmix@upenn.edu>
-Description: A function to take position data, generate hexbins and display them on a map using the Generic Mapping Tools framework
+Description: Functions to take position data, generate hexbins and display them on a map using the Generic Mapping Tools framework.
 License: GPL (>=2)
 LazyData: TRUE
 Suggests: testthat
